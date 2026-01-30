@@ -39,7 +39,6 @@
                 <i>September 2024 - September 2025</i><br />
                 Created speed estimation algorithms for LSM6 chips, Developed IMU
                 foundational models.<br />
-                Models later presented/proposed on Tesla Sim and Nvidia Issac Gym.
                 Developed regression models for environmental sensors.
             </p>
         </div>
