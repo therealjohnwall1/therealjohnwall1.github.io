@@ -5,7 +5,7 @@
 <h1>Andy's Website</h1>
 
 <p> Third year computer science student from San Jose State University. See my resume <a href="resume.pdf"> here. </a> Below are my current interests emerging from coursework
-and work experience: 
+and work experience:
 </p>
 
 <ul>
@@ -13,8 +13,9 @@ and work experience:
 <li> Computational Biology</li>
 <li> Controls and Robotics </li>
 <li> Large or Tiny Neural Networks </li>
+
 </ul>
-<p> Things I am learning/trying to learn:</p>
+<p> Things I am learning:</p>
 <ul>
 <li> Electronics </li>
 <li> Mechanical Design</li>

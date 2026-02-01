@@ -1,5 +1,4 @@
 <script lang="ts">
-    import favicon from "$lib/assets/favicon.svg";
     import "../css/global.css";
     import { base } from "$app/paths";
     import { onMount } from "svelte";
@@ -37,7 +36,6 @@
 </script>
 
 <svelte:head>
-    <link rel="icon" href={favicon} />
 </svelte:head>
 
 <header>
