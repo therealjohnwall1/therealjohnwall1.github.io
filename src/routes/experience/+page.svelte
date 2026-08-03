@@ -7,6 +7,30 @@
     <div style="display: flex; align-items: flex-start; gap: 1rem;">
         <div style="flex: 1;">
             <p>
+                <b>Tenstorrent</b><br />
+                <i>May 2026 - Present</i><br />
+                Developed FPGA NIC for trading and data movement between blackhole chips.<br />
+                P2P data movement and communication drivers.
+            </p>
+        </div>
+        <div style="flex-shrink: 0;">
+            <img
+                src="p150.jpg"
+                alt="p150 chip"
+                style="width: 150px; height: 150px; object-fit: cover; border-radius: 8px;"
+            />
+        </div>
+
+    </div>
+</div>
+
+<hr />
+
+
+<div class="Job Experience">
+    <div style="display: flex; align-items: flex-start; gap: 1rem;">
+        <div style="flex: 1;">
+            <p>
                 <b>Spartan Flight</b><br />
                 <i>April 2025 - Present</i><br />
                 Co-Founded SJSU SUAS(Student Unmanned Aerial Systems Competition).
@@ -37,7 +61,7 @@
                 <i>September 2024 - September 2025</i><br />
                 Created speed estimation algorithms for LSM6 chips, Developed IMU
                 foundational models.<br />
-                Developed regression models for environmental sensors.
+                Developed regression models for environmental sensors. Wrote firmware for sensors.
             </p>
         </div>
         <div style="flex-shrink: 0;">

@@ -8,7 +8,7 @@
 
 <h1>Andy's Website</h1>
 
-<p> Third year computer science student from San Jose State University. See my resume <a href="resume.pdf"> here. </a> Below are my current interests emerging from coursework
+<p> Third year computer science student from San Jose State University.Below are my current interests emerging from coursework
 and work experience:
 </p>
 
