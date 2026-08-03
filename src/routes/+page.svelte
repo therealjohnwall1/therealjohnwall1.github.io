@@ -1,7 +1,11 @@
 <script>
+    import BranchBackground from "$lib/BranchBackground.svelte";
 </script>
 <svelte:head>
     </svelte:head>
+
+<BranchBackground />
+
 <h1>Andy's Website</h1>
 
 <p> Third year computer science student from San Jose State University. See my resume <a href="resume.pdf"> here. </a> Below are my current interests emerging from coursework
