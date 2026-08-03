@@ -12,17 +12,22 @@
     const ITERATIONS = 8;
     const DELTA = (25.7 * Math.PI) / 180;
 
-    // The bare lower stem is ~30% of the height but under 2% of the branch
-    // mass. Framing on just the canopy drops that dead space so foliage,
-    // not stem, gets the screen.
-    const CANOPY = 0.5;
+    // Laid on its side the tree is 2.02:1 along its growth axis, close to a
+    // 16:9 screen, so the whole thing fits with nothing cropped. `angle` is
+    // the direction the trunk grows (0 = right, 90 = down, 180 = left,
+    // -90 = up); `anchorX/Y` is where the root sits as a fraction of the
+    // viewport, so 1.0 / 0.5 pins it to the middle of the right edge.
+    const SIDEWAYS = { angle: 180, anchorX: 1, anchorY: 0.5 };
 
-    // 0 = whole canopy visible (letterboxed), 1 = canopy covers the viewport
-    // in both axes (heavily cropped). The canopy is far taller than any
-    // normal screen is, so the useful range is in between: raise it to push
-    // branches further into the left/right margins at the cost of cropping
-    // more off the top and bottom.
-    const FILL = 0.4;
+    // Upright, rooted at the bottom edge. A sideways tree in a portrait
+    // window leaves most of the screen bare, and upright the tree's 0.50
+    // aspect happens to match a phone almost exactly.
+    const UPRIGHT = { angle: -90, anchorX: 0.5, anchorY: 1 };
+
+    // 0 = whole tree on screen, 1 = it covers the viewport in both axes at
+    // the cost of running off the edges. Low values keep the tip inside the
+    // far edge; raise it to push the canopy past the screen.
+    const FILL = 0.2;
 
     // Nudge the tree around, in fractions of the viewport. 0 = centered.
     // X: negative moves left, positive right. Y: negative moves UP,
@@ -54,8 +59,8 @@
         const stack: { x: number; y: number; a: number; depth: number }[] = [];
         let x = 0;
         let y = 0;
-        let a = -Math.PI / 2; // pointing up; canvas y grows downward
-        let depth = 0;
+        let a = 0; // canonical: grows along +x from the root at the origin,
+        let depth = 0; // rotated into place at layout time
 
         for (const c of word) {
             switch (c) {
@@ -96,25 +101,6 @@
 
         const model = trace(expand());
 
-        let minX = Infinity;
-        let maxX = -Infinity;
-        let minY = Infinity;
-        let maxY = -Infinity;
-        for (const s of model) {
-            minX = Math.min(minX, s.x1, s.x2);
-            maxX = Math.max(maxX, s.x1, s.x2);
-            minY = Math.min(minY, s.y1, s.y2);
-            maxY = Math.max(maxY, s.y1, s.y2);
-        }
-        const modelW = maxX - minX || 1;
-        const modelH = maxY - minY || 1;
-
-        // Frame on the canopy: the top CANOPY fraction of the bounding box,
-        // measured from the tip down. Everything below is bare stem.
-        const canopyH = modelH * CANOPY;
-        const canopyMidY = minY + canopyH / 2;
-        const canopyMidX = minX + modelW / 2;
-
         let placed: Segment[] = [];
         let cssW = 0;
         let cssH = 0;
@@ -128,19 +114,45 @@
             canvas.height = Math.round(cssH * dpr);
             ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
 
+            const o = cssH > cssW ? UPRIGHT : SIDEWAYS;
+            const rot = (o.angle * Math.PI) / 180;
+            const cos = Math.cos(rot);
+            const sin = Math.sin(rot);
+            const rx = (x: number, y: number) => x * cos - y * sin;
+            const ry = (x: number, y: number) => x * sin + y * cos;
+
+            // Bounding box in the rotated frame; the root stays at the origin.
+            let minX = Infinity;
+            let maxX = -Infinity;
+            let minY = Infinity;
+            let maxY = -Infinity;
+            for (const s of model) {
+                const ax = rx(s.x1, s.y1);
+                const ay = ry(s.x1, s.y1);
+                const bx = rx(s.x2, s.y2);
+                const by = ry(s.x2, s.y2);
+                minX = Math.min(minX, ax, bx);
+                maxX = Math.max(maxX, ax, bx);
+                minY = Math.min(minY, ay, by);
+                maxY = Math.max(maxY, ay, by);
+            }
+            const modelW = maxX - minX || 1;
+            const modelH = maxY - minY || 1;
+
             // Geometric blend between contain and cover so FILL feels linear.
-            const contain = Math.min(cssW / modelW, cssH / canopyH);
-            const cover = Math.max(cssW / modelW, cssH / canopyH);
+            const contain = Math.min(cssW / modelW, cssH / modelH);
+            const cover = Math.max(cssW / modelW, cssH / modelH);
             const scale = contain * Math.pow(cover / contain, FILL);
 
-            const offX = cssW / 2 - canopyMidX * scale + OFFSET_X * cssW;
-            const offY = cssH / 2 - canopyMidY * scale + OFFSET_Y * cssH;
+            // Offsets place the root itself, since it sits at the origin.
+            const offX = (o.anchorX + OFFSET_X) * cssW;
+            const offY = (o.anchorY + OFFSET_Y) * cssH;
 
             placed = model.map((s) => ({
-                x1: s.x1 * scale + offX,
-                y1: s.y1 * scale + offY,
-                x2: s.x2 * scale + offX,
-                y2: s.y2 * scale + offY,
+                x1: rx(s.x1, s.y1) * scale + offX,
+                y1: ry(s.x1, s.y1) * scale + offY,
+                x2: rx(s.x2, s.y2) * scale + offX,
+                y2: ry(s.x2, s.y2) * scale + offY,
                 depth: s.depth,
             }));
         }
