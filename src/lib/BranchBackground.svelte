@@ -12,14 +12,22 @@
     const ITERATIONS = 8;
     const DELTA = (25.7 * Math.PI) / 180;
 
-    // Per-tree nudge, in fractions of the viewport, applied on top of each
-    // tree's anchor. x: negative moves left, positive right. y: negative
-    // moves UP, positive down. So { x: -0.1, y: 0 } shifts that tree left by
-    // a tenth of the screen width. Both default to the same values, which is
-    // what a single shared offset used to do; change one to pull the trees
-    // apart independently.
-    const DELTA_RIGHT = { x: 0.3, y: 0.05 };
-    const DELTA_LEFT = { x: 0.3, y: 0.05 };
+    // Horizontal placement is re-rolled on every page load: each tree picks
+    // an x anywhere in its range, as a fraction of the viewport. Both ranges
+    // run outward from 0, so the right tree only ever slides further off the
+    // right edge and the left tree off the left -- they pull apart from the
+    // middle rather than crossing over. Set a range to [0, 0] to pin a tree.
+    const RIGHT_X_RANGE = [0, 0.5];
+    const LEFT_X_RANGE = [0, -0.5];
+
+    // Vertical nudge, shared and fixed. Negative moves UP, positive down.
+    const DELTA_Y = 0.05;
+
+    // The live per-tree nudge, applied on top of each tree's anchor. x is
+    // filled in at mount by the roll above; the placements below hold onto
+    // these same two objects, so writing x here moves the trees.
+    const DELTA_RIGHT = { x: 0, y: DELTA_Y };
+    const DELTA_LEFT = { x: 0, y: DELTA_Y };
 
     // A tree per screen edge, facing each other. `angle` is the direction
     // the trunk grows (0 = right, 90 = down, 180 = left, -90 = up),
@@ -161,6 +169,13 @@
     onMount(() => {
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
+
+        // Rolled here rather than at module scope so it happens on the
+        // client and re-rolls on every mount -- a reload, or navigating back
+        // to this page. Must run before the first layout() reads the deltas.
+        const pick = ([lo, hi]: number[]) => lo + Math.random() * (hi - lo);
+        DELTA_RIGHT.x = pick(RIGHT_X_RANGE);
+        DELTA_LEFT.x = pick(LEFT_X_RANGE);
 
         const model = trace(expand());
 
