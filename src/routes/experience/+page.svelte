@@ -27,9 +27,7 @@
     </div>
 </div>
 
-<hr
-    style="border: 0; height: 1px; background-color: #e0e0e0; margin: 2rem 0;"
-/>
+<hr />
 
 <div class="Job Experience">
     <div style="display: flex; align-items: flex-start; gap: 1rem;">
@@ -52,9 +50,7 @@
     </div>
 </div>
 
-<hr
-    style="border: 0; height: 1px; background-color: #e0e0e0; margin: 2rem 0;"
-/>
+<hr />
 
 <div class="Job Experience">
     <div style="display: flex; align-items: flex-start; gap: 1rem;">
@@ -70,9 +66,7 @@
     </div>
 </div>
 
-<hr
-    style="border: 0; height: 1px; background-color: #e0e0e0; margin: 2rem 0;"
-/>
+<hr />
 
 <div class="Job Experience">
     <div style="display: flex; align-items: flex-start; gap: 1rem;">
@@ -93,9 +87,7 @@
         </div>
     </div>
 </div>
-<hr
-    style="border: 0; height: 1px; background-color: #e0e0e0; margin: 2rem 0;"
-/>
+<hr />
 
 <div class="Job Experience">
     <div style="display: flex; align-items: flex-start; gap: 1rem;">
