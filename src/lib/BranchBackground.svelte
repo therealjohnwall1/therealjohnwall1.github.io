@@ -12,27 +12,39 @@
     const ITERATIONS = 8;
     const DELTA = (25.7 * Math.PI) / 180;
 
+    // Per-tree nudge, in fractions of the viewport, applied on top of each
+    // tree's anchor. x: negative moves left, positive right. y: negative
+    // moves UP, positive down. So { x: -0.1, y: 0 } shifts that tree left by
+    // a tenth of the screen width. Both default to the same values, which is
+    // what a single shared offset used to do; change one to pull the trees
+    // apart independently.
+    const DELTA_RIGHT = { x: 0.3, y: 0.05 };
+    const DELTA_LEFT = { x: 0.3, y: 0.05 };
+
     // A tree per screen edge, facing each other. `angle` is the direction
     // the trunk grows (0 = right, 90 = down, 180 = left, -90 = up),
-    // `anchorX/Y` is where the root sits as a fraction of the viewport, and
-    // `flipY` reflects the canopy. The flip is what makes the pair read as
-    // a mirror across the screen's midline -- rotation alone would make the
-    // second tree a point reflection, which reads as lopsided. Drop either
-    // entry to go back to a single tree.
+    // `anchorX/Y` is where the root sits as a fraction of the viewport,
+    // `flipY` reflects the canopy, and `delta` is that tree's own nudge.
+    // The flip is what makes the pair read as a mirror across the screen's
+    // midline -- rotation alone would make the second tree a point
+    // reflection, which reads as lopsided. Drop either entry to go back to
+    // a single tree.
     //
     // Laid on its side the tree is 2.02:1 along its growth axis, close to a
     // 16:9 screen, so each one spans the width with nothing cropped.
     const SIDEWAYS = [
-        { angle: 180, anchorX: 1, anchorY: 0.5, flipY: 1 },
-        { angle: 0, anchorX: 0, anchorY: 0.5, flipY: -1 },
+        { angle: 180, anchorX: 1, anchorY: 0.5, flipY: 1, delta: DELTA_RIGHT },
+        { angle: 0, anchorX: 0, anchorY: 0.5, flipY: -1, delta: DELTA_LEFT },
     ];
 
     // Portrait: rooted at the bottom and top edges instead. A sideways tree
     // in a portrait window leaves most of the screen bare, and upright the
-    // tree's 0.50 aspect happens to match a phone almost exactly.
+    // tree's 0.50 aspect happens to match a phone almost exactly. There is
+    // no left and right here, so the bottom tree borrows DELTA_RIGHT and the
+    // top one DELTA_LEFT.
     const UPRIGHT = [
-        { angle: -90, anchorX: 0.5, anchorY: 1, flipY: 1 },
-        { angle: 90, anchorX: 0.5, anchorY: 0, flipY: -1 },
+        { angle: -90, anchorX: 0.5, anchorY: 1, flipY: 1, delta: DELTA_RIGHT },
+        { angle: 90, anchorX: 0.5, anchorY: 0, flipY: -1, delta: DELTA_LEFT },
     ];
 
     // 0 = whole tree on screen, 1 = it covers the viewport in both axes at
@@ -49,11 +61,14 @@
     // tree curls back on itself and stops spanning a wide screen.
     const CURVE = 0;
 
-    // Nudge the tree around, in fractions of the viewport. 0 = centered.
-    // X: negative moves left, positive right. Y: negative moves UP,
-    // positive down. So -0.1 shifts by a tenth of the screen.
-    const OFFSET_X = 0.3;
-    const OFFSET_Y = 0.05;
+    // Vertical drift. This is a CSS transform on the canvas element, not a
+    // redraw: the compositor slides the already-rasterized texture on the
+    // GPU, so it costs no JS and no canvas work per frame no matter how
+    // many segments are on screen. The canvas is grown by SLIDE_PX on each
+    // side and offset to match, so sliding never exposes a bare strip at
+    // the top or bottom. Set SLIDE_PX to 0 to hold still.
+    const SLIDE_PX = 40;
+    const SLIDE_MS = 9000;
 
     const GROW_MS = 3000;
 
@@ -149,7 +164,13 @@
 
         const model = trace(expand());
 
-        type Placement = { angle: number; anchorX: number; anchorY: number; flipY: number };
+        type Placement = {
+            angle: number;
+            anchorX: number;
+            anchorY: number;
+            flipY: number;
+            delta: { x: number; y: number };
+        };
 
         // Reflect, then rotate. Every tree is the same traced model read
         // through a different transform.
@@ -171,10 +192,13 @@
             cssW = window.innerWidth;
             cssH = window.innerHeight;
 
+            // Taller than the viewport by the slide amplitude on each side.
+            // Drawing is shifted down by SLIDE_PX so layout coordinates stay
+            // viewport-relative and the extra strips sit off-screen.
             const dpr = window.devicePixelRatio || 1;
             canvas.width = Math.round(cssW * dpr);
-            canvas.height = Math.round(cssH * dpr);
-            ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
+            canvas.height = Math.round((cssH + 2 * SLIDE_PX) * dpr);
+            ctx!.setTransform(dpr, 0, 0, dpr, 0, SLIDE_PX * dpr);
 
             const trees = cssH > cssW ? UPRIGHT : SIDEWAYS;
 
@@ -206,10 +230,9 @@
 
             placed = trees.map((tree) => {
                 const t = basis(tree);
-                // Offsets place the root itself, since it sits at the origin,
-                // and shift the whole pair together rather than mirroring.
-                const offX = (tree.anchorX + OFFSET_X) * cssW;
-                const offY = (tree.anchorY + OFFSET_Y) * cssH;
+                // Offsets place the root itself, since it sits at the origin.
+                const offX = (tree.anchorX + tree.delta.x) * cssW;
+                const offY = (tree.anchorY + tree.delta.y) * cssH;
                 return model.map((s) => ({
                     x1: t.x(s.x1, s.y1) * scale + offX,
                     y1: t.y(s.x1, s.y1) * scale + offY,
@@ -249,7 +272,7 @@
         }
 
         function render(progress: number) {
-            ctx!.clearRect(0, 0, cssW, cssH);
+            ctx!.clearRect(0, -SLIDE_PX, cssW, cssH + 2 * SLIDE_PX);
             const count = placed[0]?.length ?? 0;
             if (count === 0) return;
 
@@ -337,15 +360,40 @@
     });
 </script>
 
-<canvas bind:this={canvas} aria-hidden="true"></canvas>
+<canvas
+    bind:this={canvas}
+    aria-hidden="true"
+    style="--slide: {SLIDE_PX}px; --slide-ms: {SLIDE_MS}ms;"
+></canvas>
 
 <style>
     canvas {
         position: fixed;
-        inset: 0;
+        left: 0;
+        /* Overhangs the viewport by --slide top and bottom so the drift
+           never uncovers a bare strip at either edge. */
+        top: calc(-1 * var(--slide));
         width: 100%;
-        height: 100%;
+        height: calc(100% + 2 * var(--slide));
         z-index: -1;
         pointer-events: none;
+        animation: drift var(--slide-ms) ease-in-out infinite alternate;
+    }
+
+    /* Transform-only, so this stays on the compositor and never triggers
+       layout, paint, or a canvas redraw. */
+    @keyframes drift {
+        from {
+            transform: translateY(calc(-1 * var(--slide)));
+        }
+        to {
+            transform: translateY(var(--slide));
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        canvas {
+            animation: none;
+        }
     }
 </style>
