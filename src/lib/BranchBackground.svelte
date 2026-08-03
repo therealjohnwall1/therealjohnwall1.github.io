@@ -259,10 +259,12 @@
         }
 
         // Gruvbox yellow, tuned per theme: the light palette needs a little
-        // more alpha to stay visible against #fbf1c7.
+        // more alpha to stay visible against #fbf1c7. Read off the same media
+        // query global.css themes from, so the canvas can never disagree with
+        // the page behind it.
+        const darkScheme = window.matchMedia("(prefers-color-scheme: dark)");
         function palette() {
-            const dark = document.documentElement.classList.contains("dark");
-            return dark
+            return darkScheme.matches
                 ? { color: "#fabd2f", alpha: 0.13 }
                 : { color: "#d79921", alpha: 0.18 };
         }
@@ -360,17 +362,14 @@
         };
         window.addEventListener("resize", onResize);
 
-        // The layout toggles `dark` on <html> when the OS scheme changes.
-        const themeObserver = new MutationObserver(() => render(progress));
-        themeObserver.observe(document.documentElement, {
-            attributes: true,
-            attributeFilter: ["class"],
-        });
+        // Repaint in the new palette when the OS flips scheme mid-visit.
+        const onScheme = () => render(progress);
+        darkScheme.addEventListener("change", onScheme);
 
         return () => {
             cancelAnimationFrame(frame);
             window.removeEventListener("resize", onResize);
-            themeObserver.disconnect();
+            darkScheme.removeEventListener("change", onScheme);
         };
     });
 </script>

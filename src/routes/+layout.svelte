@@ -1,42 +1,13 @@
 <script lang="ts">
     import "../css/global.css";
     import { base } from "$app/paths";
-    import { onMount } from "svelte";
 
     let { children } = $props();
-    let darkMode = $state(false);
 
-    onMount(() => {
-        const prefersDark = window.matchMedia(
-            "(prefers-color-scheme: dark)",
-        ).matches;
-        darkMode = prefersDark;
-
-        // Apply dark class to HTML element
-        if (prefersDark) {
-            document.documentElement.classList.add("dark");
-        }
-
-        // Listen for changes to color scheme preference
-        const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-        const handleChange = (e: MediaQueryListEvent) => {
-            darkMode = e.matches;
-            if (e.matches) {
-                document.documentElement.classList.add("dark");
-            } else {
-                document.documentElement.classList.remove("dark");
-            }
-        };
-        mediaQuery.addEventListener("change", handleChange);
-
-        return () => {
-            mediaQuery.removeEventListener("change", handleChange);
-        };
-    });
+    // Theming is entirely in global.css, off prefers-color-scheme. Doing it
+    // here instead would mean a light-mode flash on every load: the pages are
+    // prerendered, so the browser paints long before this file runs.
 </script>
-
-<svelte:head>
-</svelte:head>
 
 <header>
     <nav>
