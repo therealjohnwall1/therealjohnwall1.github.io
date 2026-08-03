@@ -75,7 +75,7 @@
     // many segments are on screen. The canvas is grown by SLIDE_PX on each
     // side and offset to match, so sliding never exposes a bare strip at
     // the top or bottom. Set SLIDE_PX to 0 to hold still.
-    const SLIDE_PX = 40;
+    const SLIDE_PX = 0;
     const SLIDE_MS = 9000;
 
     const GROW_MS = 3000;
