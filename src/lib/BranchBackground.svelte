@@ -12,28 +12,48 @@
     const ITERATIONS = 8;
     const DELTA = (25.7 * Math.PI) / 180;
 
+    // A tree per screen edge, facing each other. `angle` is the direction
+    // the trunk grows (0 = right, 90 = down, 180 = left, -90 = up),
+    // `anchorX/Y` is where the root sits as a fraction of the viewport, and
+    // `flipY` reflects the canopy. The flip is what makes the pair read as
+    // a mirror across the screen's midline -- rotation alone would make the
+    // second tree a point reflection, which reads as lopsided. Drop either
+    // entry to go back to a single tree.
+    //
     // Laid on its side the tree is 2.02:1 along its growth axis, close to a
-    // 16:9 screen, so the whole thing fits with nothing cropped. `angle` is
-    // the direction the trunk grows (0 = right, 90 = down, 180 = left,
-    // -90 = up); `anchorX/Y` is where the root sits as a fraction of the
-    // viewport, so 1.0 / 0.5 pins it to the middle of the right edge.
-    const SIDEWAYS = { angle: 180, anchorX: 1, anchorY: 0.5 };
+    // 16:9 screen, so each one spans the width with nothing cropped.
+    const SIDEWAYS = [
+        { angle: 180, anchorX: 1, anchorY: 0.5, flipY: 1 },
+        { angle: 0, anchorX: 0, anchorY: 0.5, flipY: -1 },
+    ];
 
-    // Upright, rooted at the bottom edge. A sideways tree in a portrait
-    // window leaves most of the screen bare, and upright the tree's 0.50
-    // aspect happens to match a phone almost exactly.
-    const UPRIGHT = { angle: -90, anchorX: 0.5, anchorY: 1 };
+    // Portrait: rooted at the bottom and top edges instead. A sideways tree
+    // in a portrait window leaves most of the screen bare, and upright the
+    // tree's 0.50 aspect happens to match a phone almost exactly.
+    const UPRIGHT = [
+        { angle: -90, anchorX: 0.5, anchorY: 1, flipY: 1 },
+        { angle: 90, anchorX: 0.5, anchorY: 0, flipY: -1 },
+    ];
 
     // 0 = whole tree on screen, 1 = it covers the viewport in both axes at
     // the cost of running off the edges. Low values keep the tip inside the
     // far edge; raise it to push the canopy past the screen.
-    const FILL = 0.2;
+    const FILL = 0.5;
+
+    // The trunk is laid directly on the parabola y = k*x^2 rather than
+    // approximated by turning, so every center-line vertex sits exactly on
+    // the curve. k is set relative to trunk length L as CURVE / L, which
+    // keeps the shape identical no matter how ITERATIONS changes L: the tip
+    // lands CURVE * L off the axis, leaving at an angle of atan(2 * CURVE).
+    // 0 is a straight trunk; negative bows the other way; past ~0.5 the
+    // tree curls back on itself and stops spanning a wide screen.
+    const CURVE = 0;
 
     // Nudge the tree around, in fractions of the viewport. 0 = centered.
     // X: negative moves left, positive right. Y: negative moves UP,
     // positive down. So -0.1 shifts by a tenth of the screen.
-    const OFFSET_X = 0;
-    const OFFSET_Y = 0;
+    const OFFSET_X = 0.3;
+    const OFFSET_Y = 0.05;
 
     const GROW_MS = 3000;
 
@@ -62,14 +82,42 @@
         let a = 0; // canonical: grows along +x from the root at the origin,
         let depth = 0; // rotated into place at layout time
 
+        // The center line is the run of unbracketed F's. Counting them first
+        // gives the parabola a length to scale itself against.
+        let trunkLen = 0;
+        let d = 0;
+        for (const c of word) {
+            if (c === "[") d++;
+            else if (c === "]") d--;
+            else if (c === "F" && d === 0) trunkLen++;
+        }
+
+        const k = CURVE / trunkLen;
+        let px = 0; // how far along the parabola's x axis the trunk has run
+
         for (const c of word) {
             switch (c) {
                 case "F": {
-                    const nx = x + Math.cos(a);
-                    const ny = y + Math.sin(a);
+                    let nx: number;
+                    let ny: number;
+                    if (depth === 0) {
+                        // Advance one unit of arc length along y = k*x^2:
+                        // dx = 1/sqrt(1 + slope^2) makes the step unit-long,
+                        // and the vertex is read straight off the parabola.
+                        const slope = 2 * k * px;
+                        px += 1 / Math.sqrt(1 + slope * slope);
+                        nx = px;
+                        ny = k * px * px;
+                    } else {
+                        nx = x + Math.cos(a);
+                        ny = y + Math.sin(a);
+                    }
                     segs.push({ x1: x, y1: y, x2: nx, y2: ny, depth });
                     x = nx;
                     y = ny;
+                    // Hand branches the parabola's tangent so limbs fork off
+                    // in the direction the trunk is actually heading.
+                    if (depth === 0) a = Math.atan(2 * k * px);
                     break;
                 }
                 case "+":
@@ -101,7 +149,21 @@
 
         const model = trace(expand());
 
-        let placed: Segment[] = [];
+        type Placement = { angle: number; anchorX: number; anchorY: number; flipY: number };
+
+        // Reflect, then rotate. Every tree is the same traced model read
+        // through a different transform.
+        function basis(p: Placement) {
+            const rot = (p.angle * Math.PI) / 180;
+            const cos = Math.cos(rot);
+            const sin = Math.sin(rot);
+            return {
+                x: (x: number, y: number) => x * cos - y * p.flipY * sin,
+                y: (x: number, y: number) => x * sin + y * p.flipY * cos,
+            };
+        }
+
+        let placed: Segment[][] = [];
         let cssW = 0;
         let cssH = 0;
 
@@ -114,23 +176,21 @@
             canvas.height = Math.round(cssH * dpr);
             ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-            const o = cssH > cssW ? UPRIGHT : SIDEWAYS;
-            const rot = (o.angle * Math.PI) / 180;
-            const cos = Math.cos(rot);
-            const sin = Math.sin(rot);
-            const rx = (x: number, y: number) => x * cos - y * sin;
-            const ry = (x: number, y: number) => x * sin + y * cos;
+            const trees = cssH > cssW ? UPRIGHT : SIDEWAYS;
 
-            // Bounding box in the rotated frame; the root stays at the origin.
+            // Sizing comes from one tree, not the pair: each should span the
+            // viewport on its own and overlap in the middle. Fitting their
+            // combined extent would shrink both to half the screen.
+            const f = basis(trees[0]);
             let minX = Infinity;
             let maxX = -Infinity;
             let minY = Infinity;
             let maxY = -Infinity;
             for (const s of model) {
-                const ax = rx(s.x1, s.y1);
-                const ay = ry(s.x1, s.y1);
-                const bx = rx(s.x2, s.y2);
-                const by = ry(s.x2, s.y2);
+                const ax = f.x(s.x1, s.y1);
+                const ay = f.y(s.x1, s.y1);
+                const bx = f.x(s.x2, s.y2);
+                const by = f.y(s.x2, s.y2);
                 minX = Math.min(minX, ax, bx);
                 maxX = Math.max(maxX, ax, bx);
                 minY = Math.min(minY, ay, by);
@@ -144,17 +204,20 @@
             const cover = Math.max(cssW / modelW, cssH / modelH);
             const scale = contain * Math.pow(cover / contain, FILL);
 
-            // Offsets place the root itself, since it sits at the origin.
-            const offX = (o.anchorX + OFFSET_X) * cssW;
-            const offY = (o.anchorY + OFFSET_Y) * cssH;
-
-            placed = model.map((s) => ({
-                x1: rx(s.x1, s.y1) * scale + offX,
-                y1: ry(s.x1, s.y1) * scale + offY,
-                x2: rx(s.x2, s.y2) * scale + offX,
-                y2: ry(s.x2, s.y2) * scale + offY,
-                depth: s.depth,
-            }));
+            placed = trees.map((tree) => {
+                const t = basis(tree);
+                // Offsets place the root itself, since it sits at the origin,
+                // and shift the whole pair together rather than mirroring.
+                const offX = (tree.anchorX + OFFSET_X) * cssW;
+                const offY = (tree.anchorY + OFFSET_Y) * cssH;
+                return model.map((s) => ({
+                    x1: t.x(s.x1, s.y1) * scale + offX,
+                    y1: t.y(s.x1, s.y1) * scale + offY,
+                    x2: t.x(s.x2, s.y2) * scale + offX,
+                    y2: t.y(s.x2, s.y2) * scale + offY,
+                    depth: s.depth,
+                }));
+            });
         }
 
         // Gruvbox yellow, tuned per theme: the light palette needs a little
@@ -187,22 +250,27 @@
 
         function render(progress: number) {
             ctx!.clearRect(0, 0, cssW, cssH);
-            if (placed.length === 0) return;
+            const count = placed[0]?.length ?? 0;
+            if (count === 0) return;
 
             const { color, alpha } = palette();
             ctx!.globalAlpha = alpha;
             ctx!.strokeStyle = color;
             ctx!.lineCap = "round";
 
-            const shown = progress * placed.length;
-            const full = Math.min(Math.floor(shown), placed.length);
+            const shown = progress * count;
+            const full = Math.min(Math.floor(shown), count);
             const frac = shown - full;
 
+            // Every tree is the same model, so one index walks them all and
+            // they grow together rather than one finishing before the next.
             for (; built < full; built++) {
-                const s = placed[built];
-                const path = bucketFor(widthFor(s.depth));
-                path.moveTo(s.x1, s.y1);
-                path.lineTo(s.x2, s.y2);
+                for (const tree of placed) {
+                    const s = tree[built];
+                    const path = bucketFor(widthFor(s.depth));
+                    path.moveTo(s.x1, s.y1);
+                    path.lineTo(s.x2, s.y2);
+                }
             }
 
             for (const [w, path] of buckets) {
@@ -210,15 +278,17 @@
                 ctx!.stroke(path);
             }
 
-            // The growing tip lives in its own throwaway path so it can be
+            // The growing tips live in a throwaway path so they can be
             // extruded continuously rather than stepping a whole segment.
-            if (frac > 0 && full < placed.length) {
-                const s = placed[full];
-                const tip = new Path2D();
-                tip.moveTo(s.x1, s.y1);
-                tip.lineTo(s.x1 + (s.x2 - s.x1) * frac, s.y1 + (s.y2 - s.y1) * frac);
-                ctx!.lineWidth = widthFor(s.depth);
-                ctx!.stroke(tip);
+            if (frac > 0 && full < count) {
+                for (const tree of placed) {
+                    const s = tree[full];
+                    const tip = new Path2D();
+                    tip.moveTo(s.x1, s.y1);
+                    tip.lineTo(s.x1 + (s.x2 - s.x1) * frac, s.y1 + (s.y2 - s.y1) * frac);
+                    ctx!.lineWidth = widthFor(s.depth);
+                    ctx!.stroke(tip);
+                }
             }
 
             ctx!.globalAlpha = 1;
