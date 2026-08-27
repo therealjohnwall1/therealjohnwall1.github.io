@@ -17,12 +17,13 @@ and work experience:
 <li> Computational Biology</li>
 <li> Controls and Robotics </li>
 <li> Large or Tiny Neural Networks </li>
+<li> firmware </li>
 
 </ul>
 <p> Things I am learning:</p>
 <ul>
 <li> Electronics </li>
-<li> Mechanical Design</li>
+<li> Vlsi </li>
 <li> Materials Chemistry </li>
 </ul>
 
